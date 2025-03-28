@@ -1,5 +1,10 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import React from "react";
+import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from "react-router-dom";
+import { ThemeProvider, createTheme } from "@mui/material/styles";
+import CssBaseline from "@mui/material/CssBaseline";
 
+// Import useAuth hook (assuming you have an AuthContext)
+import { useAuth } from "./context/AuthContext";
 
 // Import all pages
 import Login from "./pages/Login";
@@ -7,51 +12,60 @@ import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import Inventory from "./pages/Inventory";
 
-// Protected Route Component
-const ProtectedRoute = ({ children }) => {
+// Import components
+import Header from "./components/Header";
+
+// Theme Configuration
+const theme = createTheme({
+  palette: {
+    primary: { main: "#1976d2" },
+    secondary: { main: "#d81b60" },
+    success: { main: "#43a047" },
+    warning: { main: "#ffa726" },
+    error: { main: "#e53935" },
+  },
+  typography: { fontFamily: "Arial, sans-serif" },
+});
+
+// 🔐 Protected Route Component
+const ProtectedRoute = () => {
   const { isAuthenticated } = useAuth();
-  return isAuthenticated ? children : <Navigate to="/" />;
+  return isAuthenticated ? <Outlet /> : <Navigate to="/login" />;
 };
 
-// Main Layout Component (Replaced Chakra's Box & Container)
-const MainLayout = ({ children }) => (
-  <div>
-    <Header />
-    <div className="container">{children}</div> {/* Replaced Chakra with CSS class */}
-  </div>
+// 🏠 Main Layout Component (Includes Header + Pages)
+const MainLayout = () => (
+  <>
+    <Header />  {/* ✅ Header renders once here, outside <Routes> */}
+    <div className="container" style={{ padding: "20px" }}>
+      <Outlet />  {/* This renders the child page (Dashboard/Inventory) */}
+    </div>
+  </>
 );
 
 function App() {
   return (
-    <Router>
-      <Routes>
-        {/* Public Routes */}
-        <Route path="/" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        
-        {/* Protected Routes with Layout */}
-        <Route element={<MainLayout />}>
-          <Route 
-            path="/dashboard" 
-            element={
-              <ProtectedRoute>
-                <Dashboard />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/inventory" 
-            element={
-              <ProtectedRoute>
-                <Inventory />
-              </ProtectedRoute>
-            } 
-          />
-        </Route>
-        
-        
-      </Routes>
-    </Router>
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <Router>
+        <Routes>
+          {/* Public Routes (No Header Here) */}
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+
+          {/* Protected Routes with Header */}
+          <Route element={<ProtectedRoute />}>
+            <Route element={<MainLayout />}>
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/inventory" element={<Inventory />} />
+            </Route>
+          </Route>
+
+          {/* Redirect unknown routes */}
+          <Route path="*" element={<Navigate to="/login" />} />
+        </Routes>
+      </Router>
+    </ThemeProvider>
   );
 }
 

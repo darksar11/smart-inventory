@@ -1,167 +1,237 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+import { getInventory, addProduct, deleteProduct, updateProduct } from "../api";
+import { 
+    TableContainer, 
+    Table, 
+    TableHead, 
+    TableRow, 
+    TableCell, 
+    TableBody, 
+    Paper, 
+    Button, 
+    TextField, 
+    Typography, 
+    Box, 
+    Modal 
+} from "@mui/material";
 
 const Inventory = () => {
-  const [products, setProducts] = useState([]);
-  const [newProduct, setNewProduct] = useState({ productName: "", quantity: "", price: "" });
-  const [searchTerm, setSearchTerm] = useState("");
+    const [products, setProducts] = useState([]);
+    const [newProduct, setNewProduct] = useState({ productName: "", quantity: "", price: "" });
+    const [searchTerm, setSearchTerm] = useState("");
+    const [editProduct, setEditProduct] = useState(null);
+    const [isModalOpen, setIsModalOpen] = useState(false);
 
-  useEffect(() => {
-    fetchProducts();
-  }, []);
+    useEffect(() => {
+        fetchProducts();
+    }, []);
 
-  const fetchProducts = async () => {
-    const res = await axios.get("http://localhost:5000/api/inventory");
-    setProducts(res.data);
-  };
+    const fetchProducts = async () => {
+        try {
+            const response = await getInventory();
+            setProducts(response.data);
+        } catch (error) {
+            console.error("Error fetching products", error);
+        }
+    };
 
-  const addProduct = async () => {
-    await axios.post("http://localhost:5000/api/inventory", newProduct);
-    setNewProduct({ productName: "", quantity: "", price: "" });
-    fetchProducts();
-  };
+    const handleAddProduct = async () => {
+        try {
+            if (!newProduct.productName || !newProduct.quantity || !newProduct.price) {
+                alert("Please fill in all fields.");
+                return;
+            }
+            await addProduct(newProduct);
+            setNewProduct({ productName: "", quantity: "", price: "" });
+            fetchProducts();
+        } catch (error) {
+            console.error("Error adding product", error);
+        }
+    };
 
-  const deleteProduct = async (id) => {
-    await axios.delete(`http://localhost:5000/api/inventory/${id}`);
-    fetchProducts();
-  };
+    const handleDeleteProduct = async (id) => {
+        try {
+            await deleteProduct(id);
+            fetchProducts();
+        } catch (error) {
+            console.error("Error deleting product", error);
+        }
+    };
 
-  const handleChange = (e) => {
-    setNewProduct({ ...newProduct, [e.target.name]: e.target.value });
-  };
+    const handleEditProduct = async () => {
+        try {
+            if (!editProduct.productName || !editProduct.quantity || !editProduct.price) {
+                alert("Please fill in all fields.");
+                return;
+            }
+            await updateProduct(editProduct._id, editProduct);
+            setEditProduct(null);
+            setIsModalOpen(false);
+            fetchProducts();
+        } catch (error) {
+            console.error("Error updating product", error);
+        }
+    };
 
-  const filteredProducts = products.filter((p) =>
-    p.productName.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+    const lowStockThreshold = 10;
 
-  return (
-    <div style={styles.container}>
-      <h1 style={styles.heading}>Inventory Dashboard</h1>
+    return (
+        <Box sx={{ p: 4 }}>
+            <Typography variant="h4" gutterBottom>
+                Inventory Management
+            </Typography>
 
-      {/* Add Product Form */}
-      <div style={styles.form}>
-        <input
-          style={styles.input}
-          name="productName"
-          placeholder="Product Name"
-          value={newProduct.productName}
-          onChange={handleChange}
-        />
-        <input
-          style={styles.input}
-          name="quantity"
-          type="number"
-          placeholder="Quantity"
-          value={newProduct.quantity}
-          onChange={handleChange}
-        />
-        <input
-          style={styles.input}
-          name="price"
-          type="number"
-          placeholder="Price"
-          value={newProduct.price}
-          onChange={handleChange}
-        />
-        <button style={styles.button} onClick={addProduct}>Add Product</button>
-      </div>
+            {/* Product Input Fields */}
+            <Box display="flex" gap={2} mb={3} flexWrap="wrap">
+                <TextField
+                    label="Product Name"
+                    value={newProduct.productName}
+                    onChange={(e) => setNewProduct({ ...newProduct, productName: e.target.value })}
+                />
+                <TextField
+                    type="number"
+                    label="Quantity"
+                    value={newProduct.quantity}
+                    onChange={(e) => setNewProduct({ ...newProduct, quantity: e.target.value })}
+                />
+                <TextField
+                    type="number"
+                    label="Price"
+                    value={newProduct.price}
+                    onChange={(e) => setNewProduct({ ...newProduct, price: e.target.value })}
+                />
+                <Button 
+                    variant="contained" 
+                    color="primary" 
+                    onClick={handleAddProduct}
+                >
+                    Add Product
+                </Button>
+            </Box>
 
-      {/* Search */}
-      <input
-        style={styles.searchBar}
-        placeholder="Search products..."
-        value={searchTerm}
-        onChange={(e) => setSearchTerm(e.target.value)}
-      />
+            {/* Search Bar */}
+            <TextField
+                fullWidth
+                label="Search Products"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                sx={{ mb: 3 }}
+            />
 
-      {/* Table */}
-      <table style={styles.table}>
-        <thead>
-          <tr>
-            <th style={styles.th}>Name</th>
-            <th style={styles.th}>Quantity</th>
-            <th style={styles.th}>Price</th>
-            <th style={styles.th}>Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          {filteredProducts.map((p) => (
-            <tr key={p._id} style={p.quantity < 10 ? styles.lowStock : null}>
-              <td style={styles.td}>{p.productName}</td>
-              <td style={styles.td}>{p.quantity}</td>
-              <td style={styles.td}>₹{p.price}</td>
-              <td style={styles.td}>
-                <button style={styles.deleteBtn} onClick={() => deleteProduct(p._id)}>
-                  Delete
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-};
+            {/* Inventory Table */}
+            <TableContainer component={Paper}>
+                <Table>
+                    <TableHead>
+                        <TableRow>
+                            <TableCell>Product Name</TableCell>
+                            <TableCell align="right">Quantity</TableCell>
+                            <TableCell align="right">Price</TableCell>
+                            <TableCell align="right">Actions</TableCell>
+                        </TableRow>
+                    </TableHead>
+                    <TableBody>
+                        {products
+                            .filter(product => product.productName.toLowerCase().includes(searchTerm.toLowerCase()))
+                            .map((product) => (
+                                <TableRow 
+                                    key={product._id}
+                                    sx={{ 
+                                        backgroundColor: product.quantity < lowStockThreshold 
+                                            ? 'rgba(255, 0, 0, 0.1)' 
+                                            : 'inherit' 
+                                    }}
+                                >
+                                    <TableCell>{product.productName}</TableCell>
+                                    <TableCell 
+                                        align="right" 
+                                        sx={{ 
+                                            color: product.quantity < lowStockThreshold 
+                                                ? 'red' 
+                                                : 'inherit' 
+                                        }}
+                                    >
+                                        {product.quantity}
+                                    </TableCell>
+                                    <TableCell align="right">₹{product.price}</TableCell>
+                                    <TableCell align="right">
+                                        <Button
+                                            variant="outlined"
+                                            color="primary"
+                                            size="small"
+                                            onClick={() => {
+                                                setEditProduct(product);
+                                                setIsModalOpen(true);
+                                            }}
+                                            sx={{ mr: 1 }}
+                                        >
+                                            Edit
+                                        </Button>
+                                        <Button
+                                            variant="outlined"
+                                            color="error"
+                                            size="small"
+                                            onClick={() => handleDeleteProduct(product._id)}
+                                        >
+                                            Delete
+                                        </Button>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                    </TableBody>
+                </Table>
+            </TableContainer>
 
-const styles = {
-  container: {
-    padding: "40px",
-    fontFamily: "Arial",
-    maxWidth: "1000px",
-    margin: "0 auto",
-  },
-  heading: {
-    fontSize: "32px",
-    marginBottom: "30px",
-  },
-  form: {
-    display: "flex",
-    gap: "15px",
-    marginBottom: "20px",
-  },
-  input: {
-    padding: "10px",
-    fontSize: "16px",
-    flex: "1",
-  },
-  button: {
-    padding: "10px 20px",
-    fontSize: "16px",
-    background: "#3b82f6",
-    color: "white",
-    border: "none",
-    cursor: "pointer",
-  },
-  searchBar: {
-    padding: "10px",
-    marginBottom: "20px",
-    fontSize: "16px",
-    width: "100%",
-  },
-  table: {
-    width: "100%",
-    borderCollapse: "collapse",
-  },
-  th: {
-    textAlign: "left",
-    padding: "12px",
-    background: "#f3f4f6",
-    borderBottom: "2px solid #ccc",
-  },
-  td: {
-    padding: "12px",
-    borderBottom: "1px solid #ddd",
-  },
-  deleteBtn: {
-    background: "#ef4444",
-    color: "#fff",
-    border: "none",
-    padding: "6px 12px",
-    cursor: "pointer",
-  },
-  lowStock: {
-    backgroundColor: "#ffe4e6", // Light red for low stock
-  },
+            {/* Edit Modal */}
+            {isModalOpen && (
+                <Modal open={isModalOpen} onClose={() => setIsModalOpen(false)}>
+                    <Box sx={{
+                        display: "flex",
+                        justifyContent: "center",
+                        alignItems: "center",
+                        height: "100vh",
+                    }}>
+                        <Box sx={{
+                            width: "90vw",
+                            maxWidth: "400px",
+                            bgcolor: "background.paper",
+                            boxShadow: 24,
+                            p: 4,
+                            borderRadius: 2
+                        }}>
+                            <Typography variant="h6" mb={2}>Edit Product</Typography>
+                            <TextField
+                                fullWidth
+                                label="Product Name"
+                                value={editProduct?.productName || ""}
+                                onChange={(e) => setEditProduct({ ...editProduct, productName: e.target.value })}
+                                margin="normal"
+                            />
+                            <TextField
+                                fullWidth
+                                type="number"
+                                label="Quantity"
+                                value={editProduct?.quantity || ""}
+                                onChange={(e) => setEditProduct({ ...editProduct, quantity: e.target.value })}
+                                margin="normal"
+                            />
+                            <TextField
+                                fullWidth
+                                type="number"
+                                label="Price"
+                                value={editProduct?.price || ""}
+                                onChange={(e) => setEditProduct({ ...editProduct, price: e.target.value })}
+                                margin="normal"
+                            />
+                            <Box display="flex" justifyContent="space-between" mt={2}>
+                                <Button variant="contained" color="primary" onClick={handleEditProduct}>Update</Button>
+                                <Button variant="outlined" color="secondary" onClick={() => setIsModalOpen(false)}>Cancel</Button>
+                            </Box>
+                        </Box>
+                    </Box>
+                </Modal>
+            )}
+        </Box>
+    );
 };
 
 export default Inventory;
